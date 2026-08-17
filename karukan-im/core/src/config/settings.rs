@@ -143,6 +143,11 @@ pub struct ConversionSettings {
     pub n_threads: u32,
     /// Enable live conversion at startup (Ctrl+Shift+L still toggles at runtime)
     pub live_conversion: bool,
+    /// Commit the selected candidate when a printable character is typed
+    /// during conversion, instead of extending the reading and re-converting
+    /// (Mozc / Google IME behaviour). The typed character then starts the
+    /// next composition.
+    pub commit_on_input: bool,
 }
 
 /// Learning cache settings

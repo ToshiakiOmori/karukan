@@ -1,5 +1,102 @@
 use super::*;
 
+/// Engine that commits the selected candidate when a character is typed
+/// during conversion (Mozc / Google IME behaviour).
+fn commit_on_input_engine() -> InputMethodEngine {
+    InputMethodEngine::with_config(EngineConfig {
+        commit_on_input: true,
+        ..EngineConfig::default()
+    })
+}
+
+#[test]
+fn commit_on_input_commits_the_selection_and_starts_the_next_composition() {
+    let mut engine = commit_on_input_engine();
+
+    engine.process_key(&press('a'));
+    engine.process_key(&press('i'));
+    engine.process_key(&press_key(Keysym::SPACE));
+    assert!(matches!(engine.state(), InputState::Conversion { .. }));
+
+    // Whatever is selected at this point is what must reach the app.
+    let selected = engine
+        .state()
+        .candidates()
+        .and_then(|c| c.selected())
+        .map(|c| c.text.clone())
+        .expect("a conversion always has a selection");
+
+    let result = engine.process_key(&press('k'));
+    assert!(result.consumed);
+
+    let committed: Vec<_> = result
+        .actions
+        .iter()
+        .filter_map(|a| match a {
+            EngineAction::Commit(text) => Some(text.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        committed,
+        vec![selected],
+        "the typed character must commit the selection, not discard it"
+    );
+
+    // The character itself starts the next composition rather than
+    // extending the reading that was just committed. 'k' is still a pending
+    // romaji consonant, so the reading only materialises with the vowel.
+    assert!(matches!(engine.state(), InputState::Composing { .. }));
+    engine.process_key(&press('a'));
+    assert_eq!(
+        engine.input_buf.reading(),
+        "か",
+        "the new composition must start empty, not carry the committed reading"
+    );
+}
+
+#[test]
+fn commit_on_input_leaves_the_filtered_views_narrowing_incrementally() {
+    let mut engine = commit_on_input_engine();
+
+    engine.process_key(&press('a'));
+    engine.process_key(&press_key(Keysym::SPACE));
+    engine.process_key(&press_ctrl(Keysym::KEY_T));
+    assert!(
+        engine.state().filter().is_some(),
+        "Ctrl+T must open a source-filtered view"
+    );
+
+    // Inside a view the user opened to search, typing is the query — it
+    // must keep narrowing instead of committing out of the view.
+    let result = engine.process_key(&press('i'));
+    assert!(
+        !result
+            .actions
+            .iter()
+            .any(|a| matches!(a, EngineAction::Commit(_))),
+        "typing inside a filtered view must narrow, not commit"
+    );
+}
+
+#[test]
+fn commit_on_input_defaults_to_off_so_typing_still_refines() {
+    let mut engine = InputMethodEngine::new();
+
+    engine.process_key(&press('a'));
+    engine.process_key(&press('i'));
+    engine.process_key(&press_key(Keysym::SPACE));
+
+    let result = engine.process_key(&press('k'));
+    assert!(
+        !result
+            .actions
+            .iter()
+            .any(|a| matches!(a, EngineAction::Commit(_))),
+        "the default must stay upstream's refine behaviour"
+    );
+}
+
 #[test]
 fn test_conversion_char_refines_reading() {
     let mut engine = InputMethodEngine::new();

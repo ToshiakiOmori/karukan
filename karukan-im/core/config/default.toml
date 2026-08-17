@@ -45,6 +45,10 @@ light_model = "jinen-v2-xsmall-q5"
 n_threads = 4
 # 起動時にライブ変換を有効にする（Ctrl+Shift+L で実行中も切替可能）
 live_conversion = true
+# 変換中に印字可能文字を打ったとき、選択中の候補を確定してからその文字を
+# 新しい入力として扱う（Mozc / Google 日本語入力の挙動）。
+# false（既定）だと読みが伸びて変換をやり直すため、↓ で選び直した候補は捨てられる。
+commit_on_input = false
 # ユーザー辞書: ~/.local/share/karukan-im/user_dicts/ に辞書ファイルを配置（Mozc TSV or KRKN binary）
 
 [learning]

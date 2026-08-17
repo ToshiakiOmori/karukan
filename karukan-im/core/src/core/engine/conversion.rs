@@ -610,7 +610,22 @@ impl InputMethodEngine {
                 // A printable character refines instead of committing:
                 // the reading grows and the suggestion rewrites in place,
                 // keeping any active source filter.
+                //
+                // With `commit_on_input` the selected candidate is committed
+                // first and the character starts the next composition, the
+                // way Mozc / Google IME behave. Refining silently discards a
+                // deliberate candidate choice, which is the whole reason the
+                // option exists.
+                //
+                // A source-filtered view is exempt: there the incremental
+                // narrowing IS the feature the user asked for by opening it
+                // (Ctrl+R / Ctrl+T), so typing keeps refining even with the
+                // option on. Otherwise enabling it would silently disable
+                // the filter views.
                 if key.to_char().is_some() && !key.modifiers.control_key {
+                    if self.config.commit_on_input && self.state.filter().is_none() {
+                        return self.commit_then_compose(key, shift_active);
+                    }
                     return self.refine_through_composing(key, shift_active);
                 }
 
@@ -620,6 +635,31 @@ impl InputMethodEngine {
                 EngineResult::consumed()
             }
         }
+    }
+
+    /// Commit the selected candidate, then feed the keystroke to the
+    /// composing path as the start of the next composition (Mozc /
+    /// Google IME behaviour, enabled by `commit_on_input`).
+    ///
+    /// The commit actions must precede the composing ones so the frontend
+    /// flushes the committed text before it draws the new preedit. If there
+    /// is nothing to commit, fall back to refining rather than swallowing
+    /// the key.
+    fn commit_then_compose(&mut self, key: &KeyEvent, shift_active: bool) -> EngineResult {
+        let committed = self.commit_conversion();
+        if !committed
+            .actions
+            .iter()
+            .any(|a| matches!(a, EngineAction::Commit(_)))
+        {
+            return self.refine_through_composing(key, shift_active);
+        }
+
+        let mut result = committed;
+        let next = self.process_key_composing(key, shift_active);
+        result.actions.extend(next.actions);
+        result.consumed = true;
+        result
     }
 
     /// Feed a refining keystroke (printable char, Backspace) through the
