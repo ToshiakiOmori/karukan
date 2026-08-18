@@ -66,6 +66,10 @@ predictive = true
 # 補助テキストに詳細（別候補の範囲・推論時間・モデル名・文脈）を表示する。
 # Ctrl+Shift+V でいつでも切り替えられる。
 verbose = false
+# Ctrl+Shift+V での切り替えを有効にする。false にするとこのキーはkarukanに
+# 消費されず、アプリ側にそのまま渡る（例: ペーストのショートカットと衝突する
+# 場合）。表示の初期値は上の verbose 設定で決まり、この設定に関係なく効く。
+verbose_hotkey = true
 
 # どのキーがどの記号を入力するか。幅（半角・全角）は [width] が決める。
 [symbol]

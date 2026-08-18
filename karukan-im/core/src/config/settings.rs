@@ -76,6 +76,11 @@ pub struct DisplaySettings {
     /// which part the alternatives cover, inference timing, the model that
     /// ran, and the context handed to it.
     pub verbose: bool,
+    /// Whether Ctrl+Shift+V toggles `verbose` at runtime. `false` frees the
+    /// key so it reaches the application unconsumed (e.g. a paste shortcut)
+    /// instead of toggling verbose; the initial `verbose` value above still
+    /// applies either way.
+    pub verbose_hotkey: bool,
 }
 
 /// Conversion strategy mode
