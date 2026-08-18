@@ -161,6 +161,10 @@ pub struct LearningSettings {
     /// cache; longer conversion results (e.g. whole live-converted
     /// sentences) are not learned
     pub max_surface_chars: usize,
+    /// Whether prefix-matched (predictive) learning candidates are offered
+    /// in addition to exact matches. `false` keeps exact-match learning
+    /// intact; only the completion of an unfinished reading is suppressed.
+    pub predictive: bool,
 }
 
 impl Default for Settings {

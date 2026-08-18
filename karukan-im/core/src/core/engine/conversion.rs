@@ -392,16 +392,18 @@ impl InputMethodEngine {
         builder.into_candidates()
     }
 
-    /// Look up learning cache candidates for a reading (exact + prefix match, max 3).
+    /// Look up learning cache candidates for a reading (exact + prefix
+    /// match, max 3; prefix match only when `learning_predictive` is on).
     ///
     /// Returns candidates from the learning cache suitable for auto-suggest display.
     pub(super) fn lookup_learning_candidates(&self, reading: &str) -> Vec<Candidate> {
         self.lookup_learning(reading, "", MAX_LEARNING_CANDIDATES)
     }
 
-    /// Full learning history for `reading` (exact + prefix, uncapped),
-    /// narrowed by the unresolved romaji tail like the dictionary lookup —
-    /// an exact hit on the base must not swallow the typed tail.
+    /// Full learning history for `reading` (exact + prefix, uncapped;
+    /// prefix match only when `learning_predictive` is on), narrowed by the
+    /// unresolved romaji tail like the dictionary lookup — an exact hit on
+    /// the base must not swallow the typed tail.
     pub(super) fn lookup_learning_history(&self, reading: &str, pending: &str) -> Vec<Candidate> {
         self.lookup_learning(reading, pending, usize::MAX)
     }
@@ -436,27 +438,32 @@ impl InputMethodEngine {
         }
 
         // Prefix match (predictive), narrowed to the kana the tail can
-        // still become — mirrors the dictionary's expanded search
-        for (full_reading, surface, _score) in cache.prefix_lookup(reading) {
-            if candidates.len() >= max {
-                break;
-            }
-            if full_reading == reading {
-                continue;
-            }
-            if let TailConstraint::Narrow(expansions) = &constraint {
-                let rest = full_reading.strip_prefix(reading).unwrap_or(&full_reading);
-                if !expansions.iter().any(|e| rest.starts_with(e.as_str())) {
+        // still become — mirrors the dictionary's expanded search.
+        // Gated by `learning_predictive`: exact matches above are the
+        // learning the user asked to keep, this loop is the completion of
+        // a reading they have not finished typing yet.
+        if self.config.learning_predictive {
+            for (full_reading, surface, _score) in cache.prefix_lookup(reading) {
+                if candidates.len() >= max {
+                    break;
+                }
+                if full_reading == reading {
                     continue;
                 }
-            }
-            if seen.insert(surface.clone()) {
-                candidates.push(Candidate {
-                    text: surface,
-                    reading: Some(full_reading),
-                    source: Some(CandidateSource::Learning),
-                    description: None,
-                });
+                if let TailConstraint::Narrow(expansions) = &constraint {
+                    let rest = full_reading.strip_prefix(reading).unwrap_or(&full_reading);
+                    if !expansions.iter().any(|e| rest.starts_with(e.as_str())) {
+                        continue;
+                    }
+                }
+                if seen.insert(surface.clone()) {
+                    candidates.push(Candidate {
+                        text: surface,
+                        reading: Some(full_reading),
+                        source: Some(CandidateSource::Learning),
+                        description: None,
+                    });
+                }
             }
         }
 
