@@ -168,6 +168,64 @@ fn ctrl_delete_removes_prefix_twins_so_surface_does_not_resurface() {
 }
 
 #[test]
+fn learning_predictive_false_hides_prefix_matches_but_keeps_exact() {
+    // The README's own example: learning "早稲田大学" under the full reading
+    // means typing just the prefix "わせだ" shows it as a candidate. With
+    // `learning_predictive = false` that completion must disappear, while an
+    // exact-match learned entry ("あい" typed in full) must still surface.
+    let mut engine = InputMethodEngine::new();
+    engine.converters.kanji = None;
+    let mut cache = LearningCache::new(LearningConfig::default());
+    cache.record("わせだだいがく", "早稲田大学");
+    cache.record("あい", "藍");
+    engine.learning = Some(cache);
+    engine.config.learning_predictive = false;
+
+    let exact_texts: Vec<String> = engine
+        .lookup_learning_candidates("あい")
+        .into_iter()
+        .map(|c| c.text)
+        .collect();
+    assert!(
+        exact_texts.contains(&"藍".to_string()),
+        "exact-match learning must survive turning predictive off, got {:?}",
+        exact_texts,
+    );
+
+    let prefix_texts: Vec<String> = engine
+        .lookup_learning_candidates("わせだ")
+        .into_iter()
+        .map(|c| c.text)
+        .collect();
+    assert!(
+        !prefix_texts.contains(&"早稲田大学".to_string()),
+        "prefix-match (predictive) completion must be gone, got {:?}",
+        prefix_texts,
+    );
+}
+
+#[test]
+fn learning_predictive_defaults_to_true_so_prefix_matches_still_show() {
+    let mut engine = InputMethodEngine::new();
+    engine.converters.kanji = None;
+    let mut cache = LearningCache::new(LearningConfig::default());
+    cache.record("わせだだいがく", "早稲田大学");
+    engine.learning = Some(cache);
+    // engine.config.learning_predictive left at its default (true).
+
+    let texts: Vec<String> = engine
+        .lookup_learning_candidates("わせだ")
+        .into_iter()
+        .map(|c| c.text)
+        .collect();
+    assert!(
+        texts.contains(&"早稲田大学".to_string()),
+        "the default must stay upstream's predictive behaviour, got {:?}",
+        texts,
+    );
+}
+
+#[test]
 fn ctrl_delete_keeps_surface_that_another_source_also_produces() {
     // #2 regression: the learned surface equals the hiragana reading, which
     // the fallback ALWAYS produces. That fallback copy is deduped away under

@@ -101,6 +101,9 @@ pub struct EngineConfig {
     pub verbose: bool,
     /// Whether live conversion is enabled at engine startup
     pub live_conversion: bool,
+    /// Whether the learning cache offers prefix-matched (predictive)
+    /// candidates in addition to exact matches
+    pub learning_predictive: bool,
     /// Which symbol the `,` `.` `/` `[` `]` keys type
     pub symbol: SymbolStyle,
     /// The width kana input comes out at, per character group
@@ -131,6 +134,7 @@ impl EngineConfig {
             strategy: settings.conversion.strategy,
             verbose: settings.display.verbose,
             live_conversion: settings.conversion.live_conversion,
+            learning_predictive: settings.learning.predictive,
             symbol: settings.symbol.style(),
             width: settings.width,
             space: settings.symbol.space,
@@ -154,6 +158,7 @@ impl Default for EngineConfig {
             strategy: StrategyMode::default(),
             verbose: false,
             live_conversion: false,
+            learning_predictive: true,
             symbol: SymbolStyle::default(),
             width: WidthRules::default(),
             space: SpaceStyle::default(),
