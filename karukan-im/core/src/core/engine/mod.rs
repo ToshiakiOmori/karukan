@@ -585,8 +585,15 @@ impl InputMethodEngine {
             return self.toggle_live_conversion();
         }
 
-        // Ctrl+Shift+V: toggle the verbose aux line (works in all states)
-        if key.modifiers.control_key
+        // Ctrl+Shift+V: toggle the verbose aux line (works in all states).
+        // Gated by `verbose_hotkey` so the key can be freed for the
+        // application (e.g. a paste shortcut) when disabled; falling
+        // through here leaves the key unhandled, so it reaches
+        // `process_key_empty`'s final `not_consumed()` in the common case
+        // (nothing composing). The initial `verbose` setting still applies
+        // regardless of this flag.
+        if self.config.verbose_hotkey
+            && key.modifiers.control_key
             && key.modifiers.shift_key
             && (key.keysym == Keysym::KEY_V || key.keysym == Keysym::KEY_V_UPPER)
         {

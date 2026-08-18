@@ -99,6 +99,9 @@ pub struct EngineConfig {
     pub strategy: StrategyMode,
     /// Show the detailed aux line (Ctrl+Shift+V toggles it).
     pub verbose: bool,
+    /// Whether Ctrl+Shift+V toggles `verbose` at runtime; `false` frees the
+    /// key for the application (e.g. paste) instead.
+    pub verbose_hotkey: bool,
     /// Whether live conversion is enabled at engine startup
     pub live_conversion: bool,
     /// Which symbol the `,` `.` `/` `[` `]` keys type
@@ -130,6 +133,7 @@ impl EngineConfig {
             max_latency_ms: settings.conversion.max_latency_ms,
             strategy: settings.conversion.strategy,
             verbose: settings.display.verbose,
+            verbose_hotkey: settings.display.verbose_hotkey,
             live_conversion: settings.conversion.live_conversion,
             symbol: settings.symbol.style(),
             width: settings.width,
@@ -153,6 +157,7 @@ impl Default for EngineConfig {
             max_latency_ms: 100,
             strategy: StrategyMode::default(),
             verbose: false,
+            verbose_hotkey: true,
             live_conversion: false,
             symbol: SymbolStyle::default(),
             width: WidthRules::default(),

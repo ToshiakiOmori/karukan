@@ -23,6 +23,7 @@ mod rewriter;
 mod source_filter;
 mod strategy;
 mod surrounding;
+mod verbose_hotkey;
 mod width;
 
 /// Engine seeded with a learning entry `reading → surface`, no kanji model.
