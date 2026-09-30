@@ -9,6 +9,26 @@ use crate::config::settings::StrategyMode;
 
 use super::*;
 
+/// Process-global cache of the merged user dictionary.
+///
+/// The merged dictionary (potentially several large TSVs) takes seconds to
+/// load and merge. Karukan creates one engine per input context; without
+/// this cache, every new context (window/field switch) re-read and
+/// re-merged all dictionaries.
+static USER_DICT_CACHE: std::sync::OnceLock<Option<std::sync::Arc<Dictionary>>> =
+    std::sync::OnceLock::new();
+
+/// Process-global cache of loaded system dictionaries, keyed by file path.
+///
+/// Deserializing `dict.bin` expands it into hundreds of MB of heap (one
+/// allocation per reading and surface), so with one engine per input context
+/// every window that was ever typed in held its own copy. Only successful
+/// loads are cached; a missing or broken file is retried by the next engine.
+static SYSTEM_DICT_CACHE: std::sync::LazyLock<std::sync::Mutex<SystemDictCache>> =
+    std::sync::LazyLock::new(Default::default);
+
+type SystemDictCache = std::collections::HashMap<std::path::PathBuf, std::sync::Arc<Dictionary>>;
+
 /// Converters produced by the background model-loading thread, handed to the
 /// engine through the `model_loading` channel.
 pub(super) struct LoadedConverters {
@@ -206,9 +226,22 @@ impl InputMethodEngine {
             return;
         }
 
+        // Hold the lock across the load so engines initializing at the same
+        // time wait for the first load instead of each reading the file.
+        let mut cache = SYSTEM_DICT_CACHE
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(dict) = cache.get(&path) {
+            debug!("System dictionary reused from process cache: {:?}", path);
+            self.dicts.system = Some(dict.clone());
+            return;
+        }
+
         match Dictionary::load(&path) {
             Ok(dict) => {
                 debug!("System dictionary loaded from {:?}", path);
+                let dict = std::sync::Arc::new(dict);
+                cache.insert(path, dict.clone());
                 self.dicts.system = Some(dict);
             }
             Err(e) => {
@@ -268,6 +301,12 @@ impl InputMethodEngine {
             return;
         }
 
+        if let Some(cached) = USER_DICT_CACHE.get() {
+            debug!("User dictionaries resolved from process-level cache (no reload)");
+            self.dicts.user = cached.clone();
+            return;
+        }
+
         let Some(dir) = Settings::user_dict_dir() else {
             debug!("Could not determine user dictionary directory");
             return;
@@ -323,9 +362,13 @@ impl InputMethodEngine {
                     paths.len(),
                     dir
                 );
-                self.dicts.user = Some(merged);
+                let merged = std::sync::Arc::new(merged);
+                self.dicts.user = Some(merged.clone());
+                let _ = USER_DICT_CACHE.set(Some(merged));
             }
-            Ok(None) => {}
+            Ok(None) => {
+                let _ = USER_DICT_CACHE.set(None);
+            }
             Err(e) => {
                 debug!("Failed to merge user dictionaries: {}", e);
             }
